@@ -23,14 +23,13 @@ vector_store = Chroma.from_documents(chunks,embeddings)
 # st.write(chunks[0])
 # st.write(chunks[1])
 
-from langchain.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from langchain_ollama import ChatOllama
 from langchain_core.runnables import RunnablePassthrough
-from langchain.retrievers.multi_query import MultiQueryRetriever
 
-llm = ChatOllama(model="llama3.2")
+llm = ChatOllama(model="llama3.2:3b")
 # a simple technique to generate multiple questions from a single question and then retrieve documents
 # based on those questions, getting the best of both worlds.
 QUERY_PROMPT = PromptTemplate(
@@ -41,10 +40,11 @@ QUERY_PROMPT = PromptTemplate(
     overcome some of the limitations of the distance-based similarity search. Provide these
     alternative questions separated by newlines. Original question: {question}""",
 )
-retriever = MultiQueryRetriever.from_llm( vector_store.as_retriever(), llm, prompt=QUERY_PROMPT )
+retriever = vector_store.as_retriever()
 
 # RAG prompt
 template = """Answer the question based ONLY on the following context: {context} Question: {question} """
+prompt = ChatPromptTemplate.from_template(template)
 
 chain = (
     {"context": retriever, "question": RunnablePassthrough()}
