@@ -4,13 +4,23 @@ This project is a small Streamlit app that lets you ask questions about a local 
 
 The app currently loads `constitution.txt`, splits it into chunks, creates embeddings with `nomic-embed-text`, stores them in a Chroma vector store, and answers questions with `llama3.2:3b`.
 
+Streamlit is a Python framework for quickly building interactive web apps for data and AI projects. Learn more at https://streamlit.io/.
+
+## Tools
+
+| Tool | URL |
+| --- | --- |
+| <img src="https://www.google.com/s2/favicons?domain=ollama.com&sz=32" alt="Ollama logo" width="20" height="20"> Ollama | https://ollama.com/ |
+| <img src="https://www.google.com/s2/favicons?domain=langchain.com&sz=32" alt="LangChain logo" width="20" height="20"> LangChain | https://www.langchain.com/ |
+| <img src="https://www.google.com/s2/favicons?domain=trychroma.com&sz=32" alt="Chroma logo" width="20" height="20"> Chroma | https://www.trychroma.com/ |
+| <img src="https://www.google.com/s2/favicons?domain=streamlit.io&sz=32" alt="Streamlit logo" width="20" height="20"> Streamlit | https://streamlit.io/ |
+
 ## Requirements
 
 Before running the app, make sure you have:
 
 - Python 3.11 or newer
 - Ollama installed and running
-- The project dependencies from `requirements.txt`
 
 ## 1. Install Ollama
 
@@ -64,18 +74,14 @@ pip install -r requirements.txt
 
 ## VS Code Setup
 
-If VS Code shows squiggly lines under imports even after installing dependencies, it may be using the wrong Python interpreter. Point VS Code at the project virtual environment:
+This project includes `.vscode/settings.json`, so VS Code should automatically use the local virtual environment at `.venv/bin/python` when you open the folder.
 
-1. Open the Command Palette with `Cmd + Shift + P` on macOS or `Ctrl + Shift + P` on Windows/Linux.
-2. Search for and select `Python: Select Interpreter`.
-3. Choose the interpreter inside this project: `.venv/bin/python`.
-
-On Windows, choose the interpreter inside `.venv\Scripts\python.exe`.
-
-If the squiggly lines do not disappear right away, reload VS Code:
+If VS Code still shows squiggly lines under imports after installing dependencies, reload the window:
 
 1. Open the Command Palette again.
 2. Search for and select `Developer: Reload Window`.
+
+If the squiggly lines remain, open the Command Palette, select `Python: Select Interpreter`, and choose `.venv/bin/python`.
 
 ## 5. Download the Ollama Models
 
