@@ -28,6 +28,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 from langchain_ollama import ChatOllama
 from langchain_core.runnables import RunnablePassthrough
+from langchain_classic.retrievers.multi_query import MultiQueryRetriever
 
 llm = ChatOllama(model="llama3.2:3b")
 # a simple technique to generate multiple questions from a single question and then retrieve documents
@@ -40,7 +41,7 @@ QUERY_PROMPT = PromptTemplate(
     overcome some of the limitations of the distance-based similarity search. Provide these
     alternative questions separated by newlines. Original question: {question}""",
 )
-retriever = vector_store.as_retriever()
+retriever = MultiQueryRetriever.from_llm( vector_store.as_retriever(), llm, prompt=QUERY_PROMPT )
 
 # RAG prompt
 template = """Answer the question based ONLY on the following context: {context} Question: {question} """
