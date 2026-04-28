@@ -124,6 +124,12 @@ Try asking:
 - How can the Constitution be amended?
 - What does the document say about the President?
 
+You can also test whether the app avoids answering from the model's general knowledge:
+
+| Question | Expected Answer |
+| --- | --- |
+| What does the 22nd Amendment say about presidential term limits? | The app should say it does not know based on the provided document, because this `constitution.txt` file does not include the 22nd Amendment. |
+
 ## Project Files
 
 - `chatdoc.py` - Main Streamlit application
