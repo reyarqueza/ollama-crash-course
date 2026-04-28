@@ -17,7 +17,6 @@ documents = loader.load()
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 chunks = text_splitter.split_documents(documents)
 
-ollama.pull('nomic-embed-text')
 embeddings = OllamaEmbeddings(model='nomic-embed-text')
 vector_store = Chroma.from_documents(chunks,embeddings)
 
