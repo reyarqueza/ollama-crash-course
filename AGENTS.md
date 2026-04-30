@@ -1,6 +1,6 @@
 # Agent Notes
 
-This repository contains a small Streamlit RAG app that answers questions about `constitution.txt` using LangChain, Chroma, Google Gemini embeddings, and an Ollama Cloud-hosted chat model.
+This repository contains a small Streamlit RAG app that answers questions about `constitution.txt` using LangChain, Pinecone, Google Gemini embeddings, and an Ollama Cloud-hosted chat model.
 
 ## Project Overview
 
@@ -23,12 +23,14 @@ The current app does not require a local Ollama server or locally pulled Ollama 
 
 - Chat model: `gpt-oss:120b` through the Ollama Cloud API at `https://ollama.com`.
 - Embedding model: Google `models/gemini-embedding-001` through the Gemini API.
+- Vector database: Pinecone cloud.
 
 Provide API keys either as environment variables or in `.streamlit/secrets.toml`:
 
 ```toml
 OLLAMA_API_KEY = "your_ollama_api_key"
 GEMINI_API_KEY = "your_gemini_api_key"
+PINECONE_API_KEY = "your_pinecone_api_key"
 ```
 
 `GOOGLE_API_KEY` can be used instead of `GEMINI_API_KEY` because `chatdoc.py` falls back to it for Gemini embeddings.
@@ -45,14 +47,17 @@ The prompt in `chatdoc.py` intentionally tells the model to answer only from ret
 
 The app uses hybrid retrieval:
 
-- Vector retrieval with Chroma and Google Gemini embeddings.
+- Vector retrieval with Pinecone and Google Gemini embeddings.
 - Multi-query retrieval with the Ollama Cloud chat model to generate alternate search queries.
 - A small keyword backup that pulls in chunks containing exact terms from the question.
 
 Current retrieval settings:
 
 - `constitution.txt` is split into chunks of `1000` characters with `200` characters of overlap.
-- Chroma retrieves `k=6` vector results.
+- Pinecone index name: `constitution-rag`.
+- Pinecone namespace: `constitution`.
+- Pinecone vector dimension: `3072`, matching the default output dimension of `models/gemini-embedding-001`.
+- Pinecone retrieves `k=6` vector results.
 - The multi-query prompt asks the chat model to generate five alternate versions of the user's question.
 - The keyword backup adds up to the top three exact-term chunk matches after filtering common stop words.
 

@@ -1,16 +1,23 @@
 import os
 import re
+import time
 
 import streamlit as st # used to create our UI frontend 
 from langchain_community.document_loaders import TextLoader
-from langchain_community.vectorstores import Chroma
+from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pinecone import Pinecone, ServerlessSpec
 
 st.title("Chat with Document")
 
 OLLAMA_BASE_URL = "https://ollama.com"
 CHAT_MODEL = "gpt-oss:120b"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
+PINECONE_INDEX_NAME = "constitution-rag"
+PINECONE_NAMESPACE = "constitution"
+PINECONE_DIMENSION = 3072
+PINECONE_CLOUD = "aws"
+PINECONE_REGION = "us-east-1"
 
 def get_secret(name):
     value = os.getenv(name)
@@ -62,7 +69,49 @@ embeddings = GoogleGenerativeAIEmbeddings(
     model=EMBEDDING_MODEL,
     api_key=get_gemini_api_key(),
 )
-vector_store = Chroma.from_documents(chunks, embeddings)
+
+
+@st.cache_resource(show_spinner="Preparing Pinecone index...")
+def get_pinecone_index():
+    pc = Pinecone(api_key=get_secret("PINECONE_API_KEY"))
+    existing_indexes = [index_info["name"] for index_info in pc.list_indexes()]
+
+    if PINECONE_INDEX_NAME not in existing_indexes:
+        pc.create_index(
+            name=PINECONE_INDEX_NAME,
+            dimension=PINECONE_DIMENSION,
+            metric="cosine",
+            spec=ServerlessSpec(
+                cloud=PINECONE_CLOUD,
+                region=PINECONE_REGION,
+            ),
+        )
+
+        while not pc.describe_index(PINECONE_INDEX_NAME).status["ready"]:
+            time.sleep(1)
+
+    index = pc.Index(PINECONE_INDEX_NAME)
+    chunk_vectors = embeddings.embed_documents([chunk.page_content for chunk in chunks])
+    chunk_ids = [f"constitution-{i}" for i in range(len(chunks))]
+    vectors = [
+        {
+            "id": chunk_id,
+            "values": chunk_vector,
+            "metadata": {
+                "text": chunk.page_content,
+                "source": chunk.metadata.get("source", "constitution.txt"),
+                "chunk": i,
+            },
+        }
+        for i, (chunk_id, chunk, chunk_vector) in enumerate(
+            zip(chunk_ids, chunks, chunk_vectors)
+        )
+    ]
+    index.upsert(vectors=vectors, namespace=PINECONE_NAMESPACE)
+    return index
+
+
+pinecone_index = get_pinecone_index()
 
 # to see the chunks
 # st.write(chunks[0])
@@ -73,7 +122,6 @@ from langchain_core.output_parsers import StrOutputParser
 
 from langchain_ollama import ChatOllama
 from langchain_core.runnables import RunnablePassthrough
-from langchain_classic.retrievers.multi_query import MultiQueryRetriever
 
 llm = ChatOllama(
     model=CHAT_MODEL,
@@ -90,14 +138,6 @@ QUERY_PROMPT = PromptTemplate(
     overcome some of the limitations of the distance-based similarity search. Provide these
     alternative questions separated by newlines. Original question: {question}""",
 )
-base_retriever = vector_store.as_retriever(search_kwargs={"k": 6})
-
-retriever = MultiQueryRetriever.from_llm(
-    base_retriever,
-    llm,
-    prompt=QUERY_PROMPT
-)
-
 STOP_WORDS = {
     "about",
     "what",
@@ -116,8 +156,52 @@ STOP_WORDS = {
     "this",
 }
 
+
+def get_search_queries(question):
+    generated_queries = (QUERY_PROMPT | llm | StrOutputParser()).invoke(
+        {"question": question}
+    )
+    alternate_queries = [
+        query.strip()
+        for query in generated_queries.splitlines()
+        if query.strip()
+    ]
+    return [question] + alternate_queries
+
+
+def retrieve_vector_documents(question):
+    docs = []
+    seen_content = set()
+
+    for search_query in get_search_queries(question):
+        query_vector = embeddings.embed_query(search_query)
+        results = pinecone_index.query(
+            vector=query_vector,
+            top_k=6,
+            include_metadata=True,
+            namespace=PINECONE_NAMESPACE,
+        )
+
+        for match in results["matches"]:
+            text = match["metadata"]["text"]
+            if text not in seen_content:
+                docs.append(
+                    Document(
+                        page_content=text,
+                        metadata={
+                            "source": match["metadata"].get("source"),
+                            "chunk": match["metadata"].get("chunk"),
+                            "score": match["score"],
+                        },
+                    )
+                )
+                seen_content.add(text)
+
+    return docs
+
+
 def retrieve_documents(question):
-    vector_docs = retriever.invoke(question)
+    vector_docs = retrieve_vector_documents(question)
     keywords = {
         word
         for word in re.findall(r"\b[a-zA-Z]{4,}\b", question.lower())
