@@ -1,6 +1,6 @@
 # Agent Notes
 
-This repository contains a small Streamlit RAG app that answers questions about `constitution.txt` using Ollama, LangChain, and Chroma.
+This repository contains a small Streamlit RAG app that answers questions about `constitution.txt` using LangChain, Chroma, Google Gemini embeddings, and an Ollama Cloud-hosted chat model.
 
 ## Project Overview
 
@@ -19,12 +19,19 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-The app expects Ollama to be installed and running with these models available:
+The current app does not require a local Ollama server or locally pulled Ollama models. It calls hosted APIs instead:
 
-```bash
-ollama pull nomic-embed-text
-ollama pull llama3.2:3b
+- Chat model: `gpt-oss:120b` through the Ollama Cloud API at `https://ollama.com`.
+- Embedding model: Google `models/gemini-embedding-001` through the Gemini API.
+
+Provide API keys either as environment variables or in `.streamlit/secrets.toml`:
+
+```toml
+OLLAMA_API_KEY = "your_ollama_api_key"
+GEMINI_API_KEY = "your_gemini_api_key"
 ```
+
+`GOOGLE_API_KEY` can be used instead of `GEMINI_API_KEY` because `chatdoc.py` falls back to it for Gemini embeddings.
 
 Run the app with:
 
@@ -38,9 +45,16 @@ The prompt in `chatdoc.py` intentionally tells the model to answer only from ret
 
 The app uses hybrid retrieval:
 
-- Vector retrieval with Chroma and Ollama embeddings.
-- Multi-query retrieval to generate alternate search queries.
+- Vector retrieval with Chroma and Google Gemini embeddings.
+- Multi-query retrieval with the Ollama Cloud chat model to generate alternate search queries.
 - A small keyword backup that pulls in chunks containing exact terms from the question.
+
+Current retrieval settings:
+
+- `constitution.txt` is split into chunks of `1000` characters with `200` characters of overlap.
+- Chroma retrieves `k=6` vector results.
+- The multi-query prompt asks the chat model to generate five alternate versions of the user's question.
+- The keyword backup adds up to the top three exact-term chunk matches after filtering common stop words.
 
 This keyword backup is important for questions like:
 
@@ -68,5 +82,6 @@ Expected behavior: the app should say it does not know based on the provided doc
 
 - Keep the retrieved context expander while debugging RAG behavior; it shows which chunks were passed to the model.
 - Be careful when changing chunk size, retrieval `k`, or the prompt, because small changes can affect whether the model answers or refuses.
+- Be careful when changing `CHAT_MODEL`, `EMBEDDING_MODEL`, `OLLAMA_BASE_URL`, or secret handling because the app currently depends on hosted Ollama and Gemini APIs.
 - Prefer clear, beginner-friendly code and comments. This project is part of a learning-oriented crash course.
-- Do not commit `.venv`, caches, or local environment files.
+- Do not commit `.venv`, caches, `.streamlit/secrets.toml`, or other local environment files.
