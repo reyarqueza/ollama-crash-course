@@ -10,8 +10,21 @@ from pinecone import Pinecone, ServerlessSpec
 
 st.title("Chat with Document")
 
+st.markdown(
+    """
+    <style>
+    .debug-expander summary p {
+        color: rgba(250, 250, 250, 0.45);
+        font-size: 0.9rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 OLLAMA_BASE_URL = "https://ollama.com"
 CHAT_MODEL = "gpt-oss:120b"
+JUDGE_MODEL = "llama-3.1-8b-instant"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 PINECONE_INDEX_NAME = "constitution-rag"
 PINECONE_NAMESPACE = "constitution"
@@ -50,6 +63,10 @@ def get_gemini_api_key():
     if not api_key:
         api_key = get_secret("GOOGLE_API_KEY")
     return api_key.strip()
+
+
+def get_groq_api_key():
+    return get_secret("GROQ_API_KEY")
 
 
 ollama_client_kwargs = {
@@ -121,12 +138,17 @@ from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from langchain_ollama import ChatOllama
-from langchain_core.runnables import RunnablePassthrough
+from langchain_groq import ChatGroq
 
 llm = ChatOllama(
     model=CHAT_MODEL,
     base_url=OLLAMA_BASE_URL,
     client_kwargs=ollama_client_kwargs,
+)
+judge_llm = ChatGroq(
+    model=JUDGE_MODEL,
+    api_key=get_groq_api_key(),
+    temperature=0,
 )
 # a simple technique to generate multiple questions from a single question and then retrieve documents
 # based on those questions, getting the best of both worlds.
@@ -155,6 +177,7 @@ STOP_WORDS = {
     "that",
     "this",
 }
+REFUSAL = "I do not know based on the provided document."
 
 
 def get_search_queries(question):
@@ -226,14 +249,113 @@ def retrieve_documents(question):
 
     return combined_docs
 
+
+def format_docs_for_prompt(docs):
+    return "\n\n".join(
+        f"[Chunk {i}]\n{doc.page_content}"
+        for i, doc in enumerate(docs, start=1)
+    )
+
+
+def get_cited_chunk_numbers(answer, total_docs):
+    cited_numbers = {
+        int(match)
+        for match in re.findall(r"[\[【]Chunk\s*(\d+)[\]】]", answer)
+        if int(match) <= total_docs
+    }
+    return sorted(cited_numbers)
+
+
+def is_refusal(answer):
+    return REFUSAL in answer
+
+
+def get_evidence_quotes(answer):
+    return re.findall(r'Evidence:\s*["“]([^"”]+)["”]', answer, flags=re.IGNORECASE)
+
+
+def put_evidence_after_answer(answer):
+    parts = answer.split("\n\n", 1)
+    if len(parts) == 2 and parts[0].lstrip().startswith("Evidence:"):
+        return f"{parts[1]}\n\n{parts[0]}"
+    return answer
+
+
+judge_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """You are a strict evidence judge for a RAG app.
+
+Use only the evidence quote. Do not use outside knowledge.
+Consider synonyms and equivalent wording, such as "consent" and "approval".
+Reject evidence that merely mentions related names, titles, or topics without
+stating the exact fact or relationship needed to answer the question.
+
+Return only YES or NO.""",
+        ),
+        (
+            "human",
+            """Question:
+{question}
+
+Answer:
+{answer}
+
+Evidence quote:
+{evidence}
+
+Does the evidence quote directly support the answer to the question?""",
+        ),
+    ]
+)
+
+
+def judge_evidence_support(answer, question):
+    if is_refusal(answer):
+        return "YES"
+
+    evidence_quotes = get_evidence_quotes(answer)
+    if not evidence_quotes:
+        return "NO"
+
+    evidence = "\n".join(evidence_quotes)
+    judgment = (judge_prompt | judge_llm | StrOutputParser()).invoke(
+        {
+            "question": question,
+            "answer": answer,
+            "evidence": evidence,
+        }
+    )
+    return judgment.strip().upper()
+
+
+def enforce_evidence_support(answer, question):
+    judgment = judge_evidence_support(answer, question)
+    if judgment.startswith("YES"):
+        return answer, judgment
+    return REFUSAL, judgment
+
 # RAG prompt
 template = """
-Answer the question based ONLY on the following context.
+Answer the question based ONLY on the retrieved context below.
 
-If the answer is not in the context, say:
-"I do not know based on the provided document."
+Follow this order:
+1. First, find an exact quote from the context that directly answers the question.
+2. If no exact quote directly answers the question, say exactly:
+   "{refusal}"
+3. If you find an exact quote, answer using only that quote.
+
+Direct support means the quote states the exact fact or relationship needed to
+answer the question. If a name or topic appears in the context, but the context
+does not state the fact asked about, that is not enough support.
 
 Do not use outside knowledge.
+For any answer other than the refusal above, use this format:
+
+Evidence: "short exact quote" [Chunk 1]
+
+Answer: answer based only on that quote [Chunk 1]
 
 Context:
 {context}
@@ -243,21 +365,33 @@ Question:
 """
 prompt = ChatPromptTemplate.from_template(template)
 
-chain = (
-    {"context": retrieve_documents, "question": RunnablePassthrough()}
-    | prompt
-    | llm
-    | StrOutputParser()
-)
-
 question = st.text_input('Input your question')
 if question:
     docs = retrieve_documents(question)
+    context = format_docs_for_prompt(docs)
+    res = (prompt | llm | StrOutputParser()).invoke(
+        {"context": context, "question": question, "refusal": REFUSAL}
+    )
+    res, judge_result = enforce_evidence_support(res, question)
+    st.write(put_evidence_after_answer(res))
+
+    cited_chunk_numbers = get_cited_chunk_numbers(res, len(docs))
+    if not cited_chunk_numbers and not is_refusal(res):
+        st.warning("No cited evidence was provided for this answer.")
+
+    st.markdown('<div class="debug-expander">', unsafe_allow_html=True)
+    if cited_chunk_numbers:
+        with st.expander("Retrieved source chunks"):
+            for chunk_number in cited_chunk_numbers:
+                doc = docs[chunk_number - 1]
+                st.markdown(f"### Chunk {chunk_number}")
+                st.write(doc.page_content)
 
     with st.expander("Retrieved context"):
         for i, doc in enumerate(docs, start=1):
             st.markdown(f"### Chunk {i}")
             st.write(doc.page_content)
 
-    res = chain.invoke(input=(question))
-    st.write(res)
+    with st.expander("Evidence judge"):
+        st.write(f"Groq `{JUDGE_MODEL}` judgment: {judge_result}")
+    st.markdown("</div>", unsafe_allow_html=True)

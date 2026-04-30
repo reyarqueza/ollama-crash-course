@@ -1,6 +1,6 @@
 # Agent Notes
 
-This repository contains a small Streamlit RAG app that answers questions about `constitution.txt` using LangChain, Pinecone, Google Gemini embeddings, and an Ollama Cloud-hosted chat model.
+This repository contains a small Streamlit RAG app that answers questions about `constitution.txt` using LangChain, Pinecone, Google Gemini embeddings, an Ollama Cloud-hosted chat model, and a Groq-hosted evidence judge.
 
 ## Project Overview
 
@@ -22,6 +22,7 @@ pip install -r requirements.txt
 The current app does not require a local Ollama server or locally pulled Ollama models. It calls hosted APIs instead:
 
 - Chat model: `gpt-oss:120b` through the Ollama Cloud API at `https://ollama.com`.
+- Evidence judge model: Groq `llama-3.1-8b-instant`.
 - Embedding model: Google `models/gemini-embedding-001` through the Gemini API.
 - Vector database: Pinecone cloud.
 
@@ -29,6 +30,7 @@ Provide API keys either as environment variables or in `.streamlit/secrets.toml`
 
 ```toml
 OLLAMA_API_KEY = "your_ollama_api_key"
+GROQ_API_KEY = "your_groq_api_key"
 GEMINI_API_KEY = "your_gemini_api_key"
 PINECONE_API_KEY = "your_pinecone_api_key"
 ```
@@ -50,6 +52,7 @@ The app uses hybrid retrieval:
 - Vector retrieval with Pinecone and Google Gemini embeddings.
 - Multi-query retrieval with the Ollama Cloud chat model to generate alternate search queries.
 - A small keyword backup that pulls in chunks containing exact terms from the question.
+- A Groq judge pass that checks whether the exact evidence quote directly supports the drafted answer.
 
 Current retrieval settings:
 
@@ -60,6 +63,8 @@ Current retrieval settings:
 - Pinecone retrieves `k=6` vector results.
 - The multi-query prompt asks the chat model to generate five alternate versions of the user's question.
 - The keyword backup adds up to the top three exact-term chunk matches after filtering common stop words.
+- The answer prompt asks Ollama to find an exact evidence quote before answering.
+- The judge prompt asks Groq to return `YES` or `NO`; a `NO` replaces the answer with `I do not know based on the provided document.`
 
 This keyword backup is important for questions like:
 
@@ -87,6 +92,6 @@ Expected behavior: the app should say it does not know based on the provided doc
 
 - Keep the retrieved context expander while debugging RAG behavior; it shows which chunks were passed to the model.
 - Be careful when changing chunk size, retrieval `k`, or the prompt, because small changes can affect whether the model answers or refuses.
-- Be careful when changing `CHAT_MODEL`, `EMBEDDING_MODEL`, `OLLAMA_BASE_URL`, or secret handling because the app currently depends on hosted Ollama and Gemini APIs.
+- Be careful when changing `CHAT_MODEL`, `JUDGE_MODEL`, `EMBEDDING_MODEL`, `OLLAMA_BASE_URL`, or secret handling because the app currently depends on hosted Ollama, Groq, Gemini, and Pinecone APIs.
 - Prefer clear, beginner-friendly code and comments. This project is part of a learning-oriented crash course.
 - Do not commit `.venv`, caches, `.streamlit/secrets.toml`, or other local environment files.

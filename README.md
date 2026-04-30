@@ -1,8 +1,8 @@
 # Ollama Crash Course: Chat with a Document
 
-This project is a small Streamlit app that lets you ask questions about a local text document using LangChain, Pinecone, Google Gemini embeddings, and an Ollama Cloud-hosted chat model.
+This project is a small Streamlit app that lets you ask questions about a local text document using LangChain, Pinecone, Google Gemini embeddings, an Ollama Cloud-hosted chat model, and a Groq-hosted evidence judge.
 
-The app currently loads `constitution.txt`, splits it into chunks, creates embeddings with Google's `gemini-embedding-001`, stores them in a Pinecone vector index, and answers questions with `gpt-oss:120b` through the Ollama Cloud API.
+The app currently loads `constitution.txt`, splits it into chunks, creates embeddings with Google's `gemini-embedding-001`, stores them in a Pinecone vector index, drafts answers with `gpt-oss:120b` through the Ollama Cloud API, and uses Groq `llama-3.1-8b-instant` to judge whether the cited evidence supports the answer.
 
 Streamlit is a Python framework for quickly building interactive web apps for data and AI projects. Learn more at https://streamlit.io/.
 
@@ -19,6 +19,8 @@ It is hybrid because retrieval uses two approaches:
 
 The app also uses a multi-query retrieval step, which asks the chat model to generate alternate versions of the user's question before vector search. That can improve recall when the user's wording does not closely match the document.
 
+After the Ollama chat model drafts an answer, the app sends the question, answer, and exact evidence quote to a separate Groq judge model. The judge decides whether the quote directly supports the answer. If the judge says no, the app replaces the answer with `I do not know based on the provided document.`
+
 | Layer | Tool / Model | Open Source? | Where It Runs |
 | --- | --- | --- | --- |
 | UI | Streamlit | Open source | Locally during development, or on Streamlit Community Cloud if deployed |
@@ -26,10 +28,12 @@ The app also uses a multi-query retrieval step, which asks the chat model to gen
 | Vector database | Pinecone | No, hosted vector database | Pinecone cloud |
 | Embeddings | Google `gemini-embedding-001` | No, proprietary Google model | Google Gemini API / Google AI Studio cloud |
 | Chat model | OpenAI `gpt-oss:120b` via Ollama Cloud | Open-weight model under Apache 2.0; served here by Ollama | Ollama Cloud |
+| Evidence judge | Meta `llama-3.1-8b-instant` via Groq | Open-weight model; served here by Groq | Groq Cloud |
 
 Notes:
 
 - `gpt-oss:120b` is an open-weight OpenAI model available under the Apache 2.0 license, but in this app it is not running locally. The app calls Ollama's hosted Cloud API.
+- `llama-3.1-8b-instant` is used only as a judge. It does not draft the final answer; it checks whether the answer's quote directly supports the answer.
 - `gemini-embedding-001` is not open source. It is a proprietary Google embedding model accessed through a Gemini API key.
 - Pinecone stores the vectors in the `constitution-rag` index under the `constitution` namespace. The source document remains `constitution.txt`.
 - The app uses Pinecone's official Python SDK directly instead of `langchain-pinecone`. The local virtual environment is currently Python 3.14, while `langchain-pinecone==0.2.13` requires Python `<3.14`, so the direct SDK keeps this crash-course app installable in the current environment.
@@ -39,6 +43,7 @@ Notes:
 | Tool | URL |
 | --- | --- |
 | <img src="https://www.google.com/s2/favicons?domain=ollama.com&sz=32" alt="Ollama logo" width="20" height="20"> Ollama | https://ollama.com/ |
+| <img src="https://www.google.com/s2/favicons?domain=groq.com&sz=32" alt="Groq logo" width="20" height="20"> Groq | https://groq.com/ |
 | <img src="https://www.google.com/s2/favicons?domain=ai.google.dev&sz=32" alt="Google AI logo" width="20" height="20"> Google AI Studio / Gemini API | https://ai.google.dev/ |
 | <img src="https://www.google.com/s2/favicons?domain=langchain.com&sz=32" alt="LangChain logo" width="20" height="20"> LangChain | https://www.langchain.com/ |
 | <img src="https://www.google.com/s2/favicons?domain=pinecone.io&sz=32" alt="Pinecone logo" width="20" height="20"> Pinecone | https://www.pinecone.io/ |
@@ -50,10 +55,11 @@ Before running the app, make sure you have:
 
 - Python 3.14 recommended; this project is currently tested with the local `.venv` on Python 3.14
 - An Ollama API key
+- A Groq API key
 - A Google AI Studio / Gemini API key
 - A Pinecone API key
 
-You do not need a local Ollama server for the current version of this app. The chat model runs through the Ollama Cloud API, embeddings run through the Gemini API, and vector storage/search runs through Pinecone.
+You do not need a local Ollama server for the current version of this app. The chat model runs through the Ollama Cloud API, the evidence judge runs through Groq, embeddings run through the Gemini API, and vector storage/search runs through Pinecone.
 
 ## 1. Create API Keys
 
@@ -64,6 +70,10 @@ https://ollama.com/
 Create a Gemini API key from Google AI Studio:
 
 https://ai.google.dev/
+
+Create a Groq API key from GroqCloud:
+
+https://console.groq.com/keys
 
 Create a Pinecone API key from your Pinecone account:
 
@@ -117,6 +127,7 @@ Then add your API keys to `.streamlit/secrets.toml`:
 
 ```toml
 OLLAMA_API_KEY = "your_ollama_api_key"
+GROQ_API_KEY = "your_groq_api_key"
 GEMINI_API_KEY = "your_gemini_api_key"
 PINECONE_API_KEY = "your_pinecone_api_key"
 ```
@@ -150,7 +161,7 @@ http://localhost:8501
 
 Open that URL in your browser, type a question, and the app will answer using the contents of `constitution.txt`.
 
-When the app starts, it embeds the document chunks with Google Gemini, creates the Pinecone index if needed, upserts the chunks into Pinecone, and waits for your question.
+When the app starts, it embeds the document chunks with Google Gemini, creates the Pinecone index if needed, upserts the chunks into Pinecone, and waits for your question. For each question, Ollama drafts an evidence-backed answer and Groq judges whether the evidence directly supports it.
 
 ## Example Questions
 
@@ -180,6 +191,12 @@ If you see an error about `OLLAMA_API_KEY`, make sure `.streamlit/secrets.toml` 
 
 ```toml
 OLLAMA_API_KEY = "your_ollama_api_key"
+```
+
+If you see an error about `GROQ_API_KEY`, make sure `.streamlit/secrets.toml` contains:
+
+```toml
+GROQ_API_KEY = "your_groq_api_key"
 ```
 
 If you see an error about `GEMINI_API_KEY`, make sure `.streamlit/secrets.toml` contains:
@@ -216,6 +233,8 @@ python -m streamlit run chatdoc.py
 
 - Ollama `gpt-oss` model page: https://ollama.com/library/gpt-oss
 - OpenAI `gpt-oss` open-weight model overview: https://help.openai.com/en/articles/11870455
+- LangChain Groq integration docs: https://docs.langchain.com/oss/python/integrations/chat/groq
+- Groq supported models: https://console.groq.com/docs/models
 - Google Gemini embeddings docs: https://ai.google.dev/gemini-api/docs/embeddings
 - Pinecone Python SDK docs: https://docs.pinecone.io/reference/python-sdk
 
@@ -237,10 +256,11 @@ Now the stack is split like this:
 | --- | --- |
 | Embeddings | Google Gemini API |
 | Chat / answer generation | Ollama Cloud |
+| Evidence judging | Groq Cloud |
 | Vector search | Pinecone cloud |
 | App UI | Local Streamlit |
 
-That means the local computer mostly handles Python orchestration, chunking, and rendering the Streamlit UI. The neural network inference and vector search happen on cloud services optimized for model serving and similarity search.
+That means the local computer mostly handles Python orchestration, chunking, and rendering the Streamlit UI. The neural network inference, evidence judging, and vector search happen on cloud services optimized for model serving and similarity search.
 
 Google's embedding endpoint is also optimized for fast hosted embedding calls, and `constitution.txt` is small enough that sending chunks over the network is still faster than embedding locally on a typical laptop.
 
