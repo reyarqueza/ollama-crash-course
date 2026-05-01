@@ -6,7 +6,7 @@ The app currently loads `constitution.txt`, splits it into chunks, creates embed
 
 Streamlit is a Python framework for quickly building interactive web apps for data and AI projects. Learn more at https://streamlit.io/.
 
-[![1787 U.S. Constitution RAG app implementation flow](assets/rag-implementation-flow.png)](assets/rag-implementation-flow.png)
+[![1787 U.S. Constitution RAG app implementation flow](assets/rag-implementation-flow.png)](https://raw.githubusercontent.com/reyarqueza/ollama-crash-course/main/assets/rag-implementation-flow.png)
 
 ## Stack Overview
 
