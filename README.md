@@ -61,6 +61,10 @@ Before running the app, make sure you have:
 - A Google AI Studio / Gemini API key
 - A Pinecone API key
 
+```
+At the time of writing, Ollama, Groq, Google, and Pinecone have free tiers.
+```
+
 You do not need a local Ollama server for the current version of this app. The chat model runs through the Ollama Cloud API, the evidence judge runs through Groq, embeddings run through the Gemini API, and vector storage/search runs through Pinecone.
 
 ## 1. Create API Keys
