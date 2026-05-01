@@ -4,7 +4,7 @@ This repository contains a small Streamlit RAG app that answers questions about 
 
 ## Project Overview
 
-- `chatdoc.py` is the main Streamlit app.
+- `hybrid_rag_app.py` is the main Streamlit app.
 - `constitution.txt` is the source document used for retrieval.
 - `requirements.txt` contains the Python dependencies.
 - `.vscode/settings.json` points VS Code at the local `.venv` interpreter.
@@ -35,17 +35,17 @@ GEMINI_API_KEY = "your_gemini_api_key"
 PINECONE_API_KEY = "your_pinecone_api_key"
 ```
 
-`GOOGLE_API_KEY` can be used instead of `GEMINI_API_KEY` because `chatdoc.py` falls back to it for Gemini embeddings.
+`GOOGLE_API_KEY` can be used instead of `GEMINI_API_KEY` because `hybrid_rag_app.py` falls back to it for Gemini embeddings.
 
 Run the app with:
 
 ```bash
-streamlit run chatdoc.py
+streamlit run hybrid_rag_app.py
 ```
 
 ## RAG Behavior
 
-The prompt in `chatdoc.py` intentionally tells the model to answer only from retrieved context. If the answer is not in the retrieved context, the app should say it does not know based on the provided document.
+The prompt in `hybrid_rag_app.py` intentionally tells the model to answer only from retrieved context. If the answer is not in the retrieved context, the app should say it does not know based on the provided document.
 
 The app uses hybrid retrieval:
 

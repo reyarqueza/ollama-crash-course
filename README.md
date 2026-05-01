@@ -1,10 +1,12 @@
-# Ollama Crash Course: Chat with a Document
+# 1787 U.S. Constitution RAG App
 
 This project is a small Streamlit app that lets you ask questions about a local text document using LangChain, Pinecone, Google Gemini embeddings, an Ollama Cloud-hosted chat model, and a Groq-hosted evidence judge.
 
 The app currently loads `constitution.txt`, splits it into chunks, creates embeddings with Google's `gemini-embedding-001`, stores them in a Pinecone vector index, drafts answers with `gpt-oss:120b` through the Ollama Cloud API, and uses Groq `llama-3.1-8b-instant` to judge whether the cited evidence supports the answer.
 
 Streamlit is a Python framework for quickly building interactive web apps for data and AI projects. Learn more at https://streamlit.io/.
+
+![1787 U.S. Constitution RAG app implementation flow](assets/rag-implementation-flow.png)
 
 ## Stack Overview
 
@@ -150,7 +152,7 @@ If the squiggly lines remain, open the Command Palette, select `Python: Select I
 Start the Streamlit app:
 
 ```bash
-streamlit run chatdoc.py
+streamlit run hybrid_rag_app.py
 ```
 
 Streamlit will print a local URL, usually:
@@ -180,7 +182,7 @@ You can also test whether the app avoids answering from the model's general know
 
 ## Project Files
 
-- `chatdoc.py` - Main Streamlit application
+- `hybrid_rag_app.py` - Main Streamlit application
 - `constitution.txt` - Source document used by the app
 - `requirements.txt` - Python dependencies
 - `CDOC-110hdoc50.pdf` - Original PDF source included in the project
@@ -211,7 +213,7 @@ If you see an error about `PINECONE_API_KEY`, make sure `.streamlit/secrets.toml
 PINECONE_API_KEY = "your_pinecone_api_key"
 ```
 
-If Google reports that an embedding model is unavailable, check that `chatdoc.py` is using:
+If Google reports that an embedding model is unavailable, check that `hybrid_rag_app.py` is using:
 
 ```python
 EMBEDDING_MODEL = "models/gemini-embedding-001"
@@ -226,7 +228,7 @@ pip install -r requirements.txt
 If Streamlit is not found, run it through Python:
 
 ```bash
-python -m streamlit run chatdoc.py
+python -m streamlit run hybrid_rag_app.py
 ```
 
 ## References
@@ -237,31 +239,3 @@ python -m streamlit run chatdoc.py
 - Groq supported models: https://console.groq.com/docs/models
 - Google Gemini embeddings docs: https://ai.google.dev/gemini-api/docs/embeddings
 - Pinecone Python SDK docs: https://docs.pinecone.io/reference/python-sdk
-
-## Why Is It Faster Now?
-
-**Question:** Why is this version so much faster than before?
-
-**Answer:** The app is faster because the expensive model work now runs in the cloud instead of on the local machine.
-
-Before, local Ollama was doing several heavy jobs:
-
-- Embedding every document chunk with `nomic-embed-text`
-- Generating alternate retrieval queries for multi-query search
-- Generating final answers with `llama3.2:3b`
-
-Now the stack is split like this:
-
-| Task | Where It Runs |
-| --- | --- |
-| Embeddings | Google Gemini API |
-| Chat / answer generation | Ollama Cloud |
-| Evidence judging | Groq Cloud |
-| Vector search | Pinecone cloud |
-| App UI | Local Streamlit |
-
-That means the local computer mostly handles Python orchestration, chunking, and rendering the Streamlit UI. The neural network inference, evidence judging, and vector search happen on cloud services optimized for model serving and similarity search.
-
-Google's embedding endpoint is also optimized for fast hosted embedding calls, and `constitution.txt` is small enough that sending chunks over the network is still faster than embedding locally on a typical laptop.
-
-Even though `gpt-oss:120b` is much larger than `llama3.2:3b`, it can feel faster because it is running on Ollama's cloud infrastructure instead of local hardware.

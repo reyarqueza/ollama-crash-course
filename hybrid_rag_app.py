@@ -8,7 +8,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pinecone import Pinecone, ServerlessSpec
 
-st.title("Chat with Document")
+st.title("Chat with the 1787 U.S. Constitution")
 
 st.markdown(
     """
@@ -393,5 +393,5 @@ if question:
             st.write(doc.page_content)
 
     with st.expander("Evidence judge"):
-        st.write(f"Groq `{JUDGE_MODEL}` judgment: {judge_result}")
+        st.write(f"LLM-as-a-Judge result: {judge_result}")
     st.markdown("</div>", unsafe_allow_html=True)
