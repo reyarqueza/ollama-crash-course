@@ -2,7 +2,7 @@
 
 https://us-constitution.streamlit.app/
 
-<a href="assets/screenshot.png" target="_new">
+<a href="assets/screenshot.png" target="_blank_">
 <img src="assets/screenshot.png" alt="screenshot" width="50%" style="border: 1px solid gray; background-color: white;">
 </a>
 <br><br>
