@@ -1,10 +1,18 @@
-# 1787 U.S. Constitution RAG App
+# hybrid-rag-app
 
+https://us-constitution.streamlit.app/
+
+<a href="assets/screenshot.png" target="_new">
+<img src="assets/screenshot.png" alt="screenshot" width="50%" style="border: 1px solid gray; background-color: white;">
+</a>
+<br><br>
 This project is a small Streamlit app that lets you ask questions about a local text document using LangChain, Pinecone, Google Gemini embeddings, an Ollama Cloud-hosted chat model, and a Groq-hosted evidence judge.
 
 The app currently loads `constitution.txt`, splits it into chunks, creates embeddings with Google's `gemini-embedding-001`, stores them in a Pinecone vector index, drafts answers with `gpt-oss:120b` through the Ollama Cloud API, and uses Groq `llama-3.1-8b-instant` to judge whether the cited evidence supports the answer.
 
 Streamlit is a Python framework for quickly building interactive web apps for data and AI projects. Learn more at https://streamlit.io/.
+
+Below is a diagram to help visualize the architecture:
 
 [![1787 U.S. Constitution RAG app implementation flow](assets/rag-implementation-flow.png)](https://raw.githubusercontent.com/reyarqueza/ollama-crash-course/main/assets/rag-implementation-flow.png)
 
