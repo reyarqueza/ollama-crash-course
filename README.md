@@ -1,6 +1,6 @@
 # hybrid-rag-app
 
-https://us-constitution.streamlit.app/
+<a href="https://us-constitution.streamlit.app/" target="_blank">https://us-constitution.streamlit.app/</a>
 
 <a href="assets/screenshot.png" target="_blank">
 <img src="assets/screenshot.png" alt="screenshot" width="50%" style="border: 1px solid gray; background-color: white;">
